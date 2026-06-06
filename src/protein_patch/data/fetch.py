@@ -87,5 +87,6 @@ def fetch_pdbs(
             if delay:
                 time.sleep(delay)
         except Exception as e:
+            dest.unlink(missing_ok=True)  # drop any partial write so a retry re-fetches
             logger.warning("failed to fetch %s: %s", pdb_id, e)
     return paths
