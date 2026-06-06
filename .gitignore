@@ -39,3 +39,9 @@ dist/
 CLAUDE.md
 .claude/
 docs/superpowers/
+
+# Local datasets & downloaded structures (never commit)
+data/
+pdb_cache/
+*.pdb
+manifest.csv
