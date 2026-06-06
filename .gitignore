@@ -4,3 +4,13 @@
 *~
 *#
 
+# Local tooling / generated notes
+CLAUDE.md
+.claude/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+Audit_*.md
+NOTES_*.md
+docs/superpowers/
+

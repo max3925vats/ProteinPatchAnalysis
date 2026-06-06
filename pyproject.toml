@@ -1,0 +1,24 @@
+[project]
+name = "protein-patch"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "biopython>=1.81",
+    "torch>=2.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+markers = ["integration: tests that require network access (deselect with -m 'not integration')"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
