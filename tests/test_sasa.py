@@ -17,5 +17,5 @@ def test_relative_sasa_returns_fraction_per_residue():
     # one residue, exposure expressed as a fraction in [0, 1]
     assert len(rel) == 1
     (key, value), = rel.items()
-    assert key == ("A", 1, "ALA")
+    assert key == (0, "A", 1, "ALA")   # (model_id, chain, resseq, resname)
     assert 0.0 <= value <= 1.0

@@ -39,3 +39,10 @@ dist/
 CLAUDE.md
 .claude/
 docs/superpowers/
+
+# Local datasets & downloaded structures (never commit)
+# NOTE: anchored to repo root so they don't match the src/protein_patch/data/ package
+/data/
+/pdb_cache/
+*.pdb
+manifest.csv

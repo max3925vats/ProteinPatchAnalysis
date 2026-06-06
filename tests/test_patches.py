@@ -4,7 +4,12 @@ import numpy as np
 import pytest
 from protein_patch.clean import load_clean_structure
 from protein_patch.spec import PatchSpec
-from protein_patch.patches import extract_patches
+from protein_patch.patches import (
+    AtomPatch,
+    extract_atom_patches,
+    extract_patches,
+    voxelize,
+)
 
 PDB_TEXT = """\
 ATOM      1  N   ALA A   1       0.000   0.000   0.000  1.00  0.00           N
@@ -33,6 +38,28 @@ def test_extract_patches_shape_and_count():
     assert patches.max() > 0.0
     # ALA has C/N/O atoms but no sulphur -> the S channel (index 3) stays empty
     assert patches[0, 3].sum() == 0.0
+
+
+def test_atom_patches_are_centered_with_attrs():
+    struct = load_clean_structure("t", io.StringIO(PDB_TEXT))
+    spec = PatchSpec(grid_voxels=16, voxel_size=0.5, sasa_threshold=0.0)
+    patches = extract_atom_patches(struct, spec, pdb_id="t")
+    assert len(patches) == 1
+    p = patches[0]
+    assert isinstance(p, AtomPatch)
+    half = spec.side_angstroms / 2.0
+    assert np.all(np.abs(p.coords) <= half + 1e-6)
+    assert p.provenance == ("t", "A", 1, "", "ALA")   # (pdb, chain, resseq, icode, resname)
+    assert p.attrs["resname"] == "ALA" and p.attrs["charge"] == 0.0
+
+
+def test_voxelize_atompatch_matches_extract_patches_grid():
+    # Regression guard: the atom-set path reproduces the old grid exactly.
+    struct = load_clean_structure("t", io.StringIO(PDB_TEXT))
+    spec = PatchSpec(grid_voxels=16, voxel_size=0.5, sasa_threshold=0.0)
+    grid_via_wrapper = extract_patches(struct, spec)
+    grid_via_atomset = voxelize(extract_atom_patches(struct, spec)[0], spec)
+    assert np.array_equal(grid_via_wrapper[0], grid_via_atomset)
 
 
 @pytest.mark.integration
