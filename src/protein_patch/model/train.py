@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import logging
 import os
@@ -78,8 +79,11 @@ def train(train_dir: str, val_dir: str, spec: PatchSpec, cfg: TrainConfig,
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": opt.state_dict(),
+                "scheduler_state_dict": sched.state_dict(),
                 "best_val_loss": val_loss,
-                "config": cfg,
+                # plain dict (not the dataclass) so the checkpoint can be
+                # loaded with torch.load(weights_only=True)
+                "config": dataclasses.asdict(cfg),
             }, cfg.checkpoint_path)
         if stopper.should_stop:
             logger.info("early stopping at epoch %d (no val improvement in %d)",

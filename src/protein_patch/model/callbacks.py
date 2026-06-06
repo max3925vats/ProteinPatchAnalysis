@@ -1,14 +1,15 @@
 from dataclasses import dataclass, field
 
 
-@dataclass
+@dataclass  # intentionally mutable: step() updates `best` and `count`
 class EarlyStopping:
     """Tracks validation-loss improvement to decide when to stop training.
 
     `step(val_loss)` returns True if this value is a new best (an
     improvement), which the caller can use to trigger a checkpoint save.
     `should_stop` is True once `patience` consecutive non-improving values
-    have been seen. A `patience` of 0 disables stopping entirely.
+    have been seen. A `patience` of 0 (or any value <= 0) disables stopping
+    entirely.
     """
 
     patience: int

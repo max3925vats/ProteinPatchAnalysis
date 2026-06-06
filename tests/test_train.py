@@ -60,10 +60,13 @@ def test_train_saves_best_checkpoint(tmp_path, rng):
     cfg = TrainConfig(epochs=2, batch_size=2, checkpoint_path=str(ckpt))
     train(str(tmp_path / "train"), str(tmp_path / "val"), spec, cfg)
     assert ckpt.exists()
-    blob = torch.load(ckpt, weights_only=False)
+    # config is stored as a plain dict, so the checkpoint loads under the
+    # safe default weights_only=True
+    blob = torch.load(ckpt, weights_only=True)
     assert {"epoch", "model_state_dict", "optimizer_state_dict",
-            "best_val_loss", "config"} <= set(blob.keys())
+            "scheduler_state_dict", "best_val_loss", "config"} <= set(blob.keys())
     assert isinstance(blob["best_val_loss"], float)
+    assert blob["config"]["latent_dim"] == cfg.latent_dim
 
 
 def test_train_writes_no_checkpoint_when_path_none(tmp_path, rng):
