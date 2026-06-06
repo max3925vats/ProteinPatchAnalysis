@@ -1,9 +1,21 @@
+from typing import Protocol, runtime_checkable
+
 import numpy as np
 import torch
 
 
-def embed_patches(model: "torch.nn.Module", dataset, device: str = "cpu") -> np.ndarray:
+@runtime_checkable
+class PatchLike(Protocol):
+    """Minimal dataset interface embed_patches needs (e.g. PatchDataset)."""
+    def __len__(self) -> int: ...
+    def __getitem__(self, i: int) -> torch.Tensor: ...
+
+
+def embed_patches(model: torch.nn.Module, dataset: PatchLike,
+                  device: str = "cpu") -> np.ndarray:
     """Encode every patch in *dataset* to its latent mean vector (mu).
+
+    Side effect: moves *model* to *device* and sets it to eval mode.
 
     Args:
         model: A ``ConvVAE3D`` instance with an ``encode(x) -> (mu, logvar)``
