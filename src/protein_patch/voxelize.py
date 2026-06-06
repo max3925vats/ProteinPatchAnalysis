@@ -1,17 +1,25 @@
 import numpy as np
 
-from .atom_types import atom_channel, ELEMENTS  # noqa: F401 (re-exported for convenience)
+from .atom_types import atom_channel
 from .spec import PatchSpec
 
 
-def gaussian_density(distance: np.ndarray | float, std: float) -> np.ndarray | float:
-    """exp(-d^2 / (2 std^2)). Accepts scalars or arrays (vectorized)."""
+def gaussian_density(distance: np.ndarray | float, std: float) -> np.ndarray:
+    """exp(-d^2 / (2 std^2)). Accepts scalars or arrays (vectorized).
+
+    Always returns a numpy array (a 0-d array for scalar input), which
+    compares equal to the corresponding Python scalar.
+    """
     return np.exp(-(np.asarray(distance) ** 2) / (2.0 * std**2))
 
 
 def center_of_geometry(coords: np.ndarray) -> np.ndarray:
-    """Mean xyz of an (n_atoms, 3) coordinate array."""
-    return np.asarray(coords, dtype=float).mean(axis=0)
+    """Mean xyz of an (n_atoms, 3) coordinate array. Returns float64.
+
+    Kept at float64 for positional precision; values are cast to the
+    float32 grid contract downstream in `voxelize_atoms`.
+    """
+    return np.asarray(coords, dtype=np.float64).mean(axis=0)
 
 
 def voxelize_atoms(
