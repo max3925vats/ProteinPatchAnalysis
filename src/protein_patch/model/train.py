@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import logging
 import os
@@ -10,6 +11,7 @@ from torch.utils.data import DataLoader
 
 from ..config import TrainConfig
 from ..spec import PatchSpec
+from .callbacks import EarlyStopping
 from .dataset import PatchDataset
 from .vae import ConvVAE3D, vae_loss
 
@@ -45,6 +47,7 @@ def train(train_dir: str, val_dir: str, spec: PatchSpec, cfg: TrainConfig,
     tl = DataLoader(PatchDataset(train_dir), batch_size=cfg.batch_size, shuffle=True)
     vl = DataLoader(PatchDataset(val_dir), batch_size=cfg.batch_size)
 
+    stopper = EarlyStopping(cfg.patience)
     hist: dict[str, list[float]] = {"train_loss": [], "val_loss": []}
     for epoch in range(cfg.epochs):
         model.train(); tr = 0.0
@@ -69,6 +72,23 @@ def train(train_dir: str, val_dir: str, spec: PatchSpec, cfg: TrainConfig,
         hist["val_loss"].append(val_loss)
         logger.info("epoch %d/%d  train=%.4f  val=%.4f",
                     epoch + 1, cfg.epochs, train_loss, val_loss)
+
+        improved = stopper.step(val_loss)
+        if improved and cfg.checkpoint_path is not None:
+            torch.save({
+                "epoch": epoch,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": opt.state_dict(),
+                "scheduler_state_dict": sched.state_dict(),
+                "best_val_loss": val_loss,
+                # plain dict (not the dataclass) so the checkpoint can be
+                # loaded with torch.load(weights_only=True)
+                "config": dataclasses.asdict(cfg),
+            }, cfg.checkpoint_path)
+        if stopper.should_stop:
+            logger.info("early stopping at epoch %d (no val improvement in %d)",
+                        epoch + 1, cfg.patience)
+            break
 
     if out is not None:
         Path(out).write_text(json.dumps(hist))
