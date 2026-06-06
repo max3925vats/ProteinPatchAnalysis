@@ -50,7 +50,7 @@ def _make_patches(tmp_path, rng):
         d.mkdir()
         for i in range(4):
             coords = (rng.random((5, 3)).astype("float32") - 0.5) * 3.0
-            patch = AtomPatch(coords, ["C"] * 5, {}, ("x", "A", i, "ALA"))
+            patch = AtomPatch(coords, ["C"] * 5, {}, ("x", "A", i, "", "ALA"))
             with open(d / f"p{i}.pickle", "wb") as f:
                 pickle.dump(patch, f)
     return spec

@@ -15,6 +15,10 @@ class PatchDataset(Dataset):
     The on-disk artifact is the representation-agnostic atom-set; this
     dataset turns it into the (C, L, L, L) grid the conv VAE consumes.
     Results are cached in memory after first access (idempotent reads).
+
+    The cache is unbounded (one grid per accessed patch). Fine for the
+    expected scale (hundreds–thousands of patches); add an eviction policy
+    before scaling to tens of thousands.
     """
 
     def __init__(self, root: str | Path, spec: PatchSpec):

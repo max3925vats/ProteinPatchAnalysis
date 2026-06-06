@@ -58,7 +58,7 @@ def test_one_epoch_training_runs(tmp_path, rng):
         d = tmp_path / split; d.mkdir()
         for i in range(4):
             coords = (rng.random((5, 3)).astype("float32") - 0.5) * 3.0
-            patch = AtomPatch(coords, ["C"] * 5, {}, ("x", "A", i, "ALA"))
+            patch = AtomPatch(coords, ["C"] * 5, {}, ("x", "A", i, "", "ALA"))
             with open(d / f"p{i}.pickle", "wb") as f:
                 pickle.dump(patch, f)
     cfg = TrainConfig(epochs=1, batch_size=2)

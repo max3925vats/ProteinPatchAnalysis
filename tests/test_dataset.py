@@ -10,7 +10,7 @@ from protein_patch.model.dataset import PatchDataset
 
 def _atom_patch(rng, n=5):
     coords = (rng.random((n, 3)).astype("float32") - 0.5) * 3.0   # within cube
-    return AtomPatch(coords, ["C"] * n, {"resname": "ALA"}, ("x", "A", 1, "ALA"))
+    return AtomPatch(coords, ["C"] * n, {"resname": "ALA"}, ("x", "A", 1, "", "ALA"))
 
 
 def test_dataset_voxelizes_atompatch_on_load(tmp_path, rng):

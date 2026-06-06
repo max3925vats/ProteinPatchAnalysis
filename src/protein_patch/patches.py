@@ -19,10 +19,10 @@ def _residue_cog(residue: Residue) -> np.ndarray:
 @dataclass(frozen=True)
 class AtomPatch:
     """Atoms within the cube around one exposed residue, centered on its COG."""
-    coords: np.ndarray                      # (n_atoms, 3), centered (origin = COG)
-    elements: list[str]                     # element symbol per atom
-    attrs: ResidueAttributes                # central-residue chemical attributes
-    provenance: tuple[str, str, int, str]   # (pdb_id, chain_id, resseq, resname)
+    coords: np.ndarray                           # (n_atoms, 3), centered (origin = COG)
+    elements: list[str]                          # element symbol per atom
+    attrs: ResidueAttributes                     # central-residue chemical attributes
+    provenance: tuple[str, str, int, str, str]   # (pdb_id, chain, resseq, icode, resname)
 
 
 def extract_atom_patches(structure: Structure, spec: PatchSpec,
@@ -49,8 +49,9 @@ def extract_atom_patches(structure: Structure, spec: PatchSpec,
                         sel_e.append(atom.element)
                 centered = np.asarray(sel_c, dtype=np.float64) - center
                 attrs = residue_attributes(name, exposure.get(key, 0.0))
+                icode = res.id[2].strip()   # insertion code ("" if none)
                 patches.append(AtomPatch(centered, sel_e, attrs,
-                                         (pdb_id, chain.id, res.id[1], name)))
+                                         (pdb_id, chain.id, res.id[1], icode, name)))
     return patches
 
 

@@ -49,7 +49,7 @@ def test_atom_patches_are_centered_with_attrs():
     assert isinstance(p, AtomPatch)
     half = spec.side_angstroms / 2.0
     assert np.all(np.abs(p.coords) <= half + 1e-6)
-    assert p.provenance == ("t", "A", 1, "ALA")
+    assert p.provenance == ("t", "A", 1, "", "ALA")   # (pdb, chain, resseq, icode, resname)
     assert p.attrs["resname"] == "ALA" and p.attrs["charge"] == 0.0
 
 

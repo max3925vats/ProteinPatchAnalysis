@@ -4,14 +4,14 @@ import pickle
 import random
 from pathlib import Path
 
-from ..patches import extract_atom_patches
+from ..patches import AtomPatch, extract_atom_patches
 from ..spec import PatchSpec
 from ..clean import load_clean_structure
 
 logger = logging.getLogger(__name__)
 
 
-def process_one(pdb_path: str | Path, spec: PatchSpec) -> list:
+def process_one(pdb_path: str | Path, spec: PatchSpec) -> list[AtomPatch]:
     """Clean one PDB and extract its AtomPatches (pure; no disk writes)."""
     pdb_id = Path(pdb_path).stem
     structure = load_clean_structure(pdb_id, str(pdb_path))
@@ -46,26 +46,30 @@ def prep_dataset(pdb_dir: str | Path, out_dir: str | Path, spec: PatchSpec,
 
     rows: list[dict] = []
     train_pdbs: list[str] = []
+    # NOTE: serial on purpose (deterministic + simple to test). `process_one`
+    # is the pure per-protein unit a multiprocessing.Pool would map over if
+    # prep wall-time ever becomes a bottleneck at scale.
     for pdb in pdbs:
         split = "val" if pdb.stem in val_pdbs else "train"
-        if split == "train":
-            train_pdbs.append(pdb.stem)
         try:
             patches = process_one(pdb, spec)
         except Exception as e:
             logger.warning("skipping %s: %s", pdb.name, e)
             continue
+        if split == "train":
+            train_pdbs.append(pdb.stem)   # only count PDBs that actually produced patches
         for p in patches:
-            pid, chain, resseq, resname = p.provenance
-            fname = f"{pid}_{chain}_{resseq}.pickle"
+            pid, chain, resseq, icode, resname = p.provenance
+            fname = f"{pid}_{chain}_{resseq}{icode}.pickle"   # icode keeps 47A/47B distinct
             with open(out_dir / split / fname, "wb") as f:
                 pickle.dump(p, f)
             rows.append({"patch_file": fname, "pdb_id": pid, "chain": chain,
-                         "resseq": resseq, "resname": resname, "split": split})
+                         "resseq": resseq, "icode": icode, "resname": resname,
+                         "split": split})
 
     with open(out_dir / "manifest.csv", "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=["patch_file", "pdb_id", "chain",
-                                          "resseq", "resname", "split"])
+                                          "resseq", "icode", "resname", "split"])
         w.writeheader()
         w.writerows(rows)
 
