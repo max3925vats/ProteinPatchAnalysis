@@ -4,7 +4,12 @@ import numpy as np
 import pytest
 from protein_patch.clean import load_clean_structure
 from protein_patch.spec import PatchSpec
-from protein_patch.patches import extract_patches
+from protein_patch.patches import (
+    AtomPatch,
+    extract_atom_patches,
+    extract_patches,
+    voxelize,
+)
 
 PDB_TEXT = """\
 ATOM      1  N   ALA A   1       0.000   0.000   0.000  1.00  0.00           N
@@ -33,9 +38,6 @@ def test_extract_patches_shape_and_count():
     assert patches.max() > 0.0
     # ALA has C/N/O atoms but no sulphur -> the S channel (index 3) stays empty
     assert patches[0, 3].sum() == 0.0
-
-
-from protein_patch.patches import AtomPatch, extract_atom_patches, voxelize
 
 
 def test_atom_patches_are_centered_with_attrs():

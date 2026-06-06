@@ -7,25 +7,22 @@ from Bio.PDB.Structure import Structure
 from .spec import PatchSpec
 from .sasa import relative_sasa
 from .voxelize import voxelize_atoms, center_of_geometry
-from .data.attributes import residue_attributes
+from .data.attributes import ResidueAttributes, residue_attributes
 
 
-def _residue_atoms(residue: Residue) -> tuple[np.ndarray, list[str]]:
-    """Extract (coords, elements) arrays from a Biopython Residue."""
-    coords, elements = [], []
-    for atom in residue:
-        coords.append(atom.get_coord())
-        elements.append(atom.element)
-    return np.array(coords, dtype=float), elements
+def _residue_cog(residue: Residue) -> np.ndarray:
+    """Center of geometry of a residue's own atoms (float64)."""
+    coords = [atom.get_coord() for atom in residue]
+    return center_of_geometry(np.asarray(coords, dtype=np.float64))
 
 
-@dataclass
+@dataclass(frozen=True)
 class AtomPatch:
     """Atoms within the cube around one exposed residue, centered on its COG."""
-    coords: np.ndarray          # (n_atoms, 3), centered (origin = residue COG)
-    elements: list[str]         # element symbol per atom
-    attrs: dict                 # residue_attributes(...) output
-    provenance: tuple           # (pdb_id, chain_id, resseq, resname)
+    coords: np.ndarray                      # (n_atoms, 3), centered (origin = COG)
+    elements: list[str]                     # element symbol per atom
+    attrs: ResidueAttributes                # central-residue chemical attributes
+    provenance: tuple[str, str, int, str]   # (pdb_id, chain_id, resseq, resname)
 
 
 def extract_atom_patches(structure: Structure, spec: PatchSpec,
@@ -41,10 +38,9 @@ def extract_atom_patches(structure: Structure, spec: PatchSpec,
                 key = (chain.id, res.id[1], name)
                 if exposure.get(key, 0.0) < spec.sasa_threshold:
                     continue
-                coords, _ = _residue_atoms(res)
-                if len(coords) == 0:
+                if len(list(res.get_atoms())) == 0:
                     continue
-                center = center_of_geometry(coords)
+                center = _residue_cog(res)
                 sel_c, sel_e = [], []
                 for atom in model.get_atoms():
                     c = atom.get_coord()
