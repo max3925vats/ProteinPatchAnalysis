@@ -1,16 +1,41 @@
+# Data / serialized arrays
 *.pickle
+*.npy
+*.npz
 *.json
-*.h
-*~
-*#
 
-# Local tooling / generated notes
-CLAUDE.md
-.claude/
+# Model / training artifacts
+*.pt
+*.pth
+*.h
+*.h5
+*.ckpt
+
+# Python caches, build & environments
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
-Audit_*.md
-NOTES_*.md
-docs/superpowers/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
 
+# Editor backups & lockfiles
+*~
+*#
+.#*
+
+# Internal docs / notes / decks (README.md stays tracked; everything else doesn't)
+*.md
+!README.md
+*.pptx
+*.ppt
+
+# Local tooling
+CLAUDE.md
+.claude/
+docs/superpowers/
