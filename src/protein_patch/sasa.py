@@ -11,7 +11,7 @@ MAX_ASA: dict[str, float] = {
 }
 
 
-def relative_sasa(structure: Structure) -> dict[tuple, float]:
+def relative_sasa(structure: Structure) -> dict[tuple[str, int, str], float]:
     """Per-residue relative solvent accessibility in [0, 1].
 
     Computes absolute SASA with Biopython's Shrake-Rupley implementation
@@ -19,7 +19,7 @@ def relative_sasa(structure: Structure) -> dict[tuple, float]:
     Key = (chain_id, resseq, resname).
     """
     ShrakeRupley().compute(structure, level="R")
-    out: dict[tuple, float] = {}
+    out: dict[tuple[str, int, str], float] = {}
     for model in structure:
         for chain in model:
             for res in chain:
@@ -27,5 +27,6 @@ def relative_sasa(structure: Structure) -> dict[tuple, float]:
                 if not is_aa(res, standard=True) or name not in MAX_ASA:
                     continue
                 key = (chain.id, res.id[1], name)
-                out[key] = min(res.sasa / MAX_ASA[name], 1.0)
+                # clamp to [0, 1]; SASA is non-negative but guard defensively
+                out[key] = max(0.0, min(res.sasa / MAX_ASA[name], 1.0))
     return out

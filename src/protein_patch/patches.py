@@ -1,4 +1,5 @@
 import numpy as np
+from Bio.PDB.Residue import Residue
 from Bio.PDB.Structure import Structure
 
 from .spec import PatchSpec
@@ -6,7 +7,7 @@ from .sasa import relative_sasa
 from .voxelize import voxelize_atoms, center_of_geometry
 
 
-def _residue_atoms(residue) -> tuple[np.ndarray, list[str]]:
+def _residue_atoms(residue: Residue) -> tuple[np.ndarray, list[str]]:
     """Extract (coords, elements) arrays from a Biopython Residue."""
     coords, elements = [], []
     for atom in residue:
@@ -44,9 +45,11 @@ def extract_patches(structure: Structure, spec: PatchSpec) -> np.ndarray:
                 center = center_of_geometry(coords)
                 grid_min = center - half
 
-                # Collect all structure atoms that fall inside the cube.
+                # Collect atoms from THIS model that fall inside the cube.
+                # Scoping to `model` (not `structure`) avoids pulling atoms
+                # from every model of a multi-model NMR ensemble into each patch.
                 all_coords, all_el = [], []
-                for atom in structure.get_atoms():
+                for atom in model.get_atoms():
                     c = atom.get_coord()
                     if np.all(np.abs(c - center) <= half):
                         all_coords.append(c)

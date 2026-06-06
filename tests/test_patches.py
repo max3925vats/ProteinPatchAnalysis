@@ -29,6 +29,10 @@ def test_extract_patches_shape_and_count():
     assert patches.shape == (1, 4, 16, 16, 16)   # (n, C, L, L, L), channel-first
     assert patches.dtype == np.float32
     assert not np.isnan(patches).any()
+    # non-vacuity: real atomic density was deposited (a zero-stub would fail here)
+    assert patches.max() > 0.0
+    # ALA has C/N/O atoms but no sulphur -> the S channel (index 3) stays empty
+    assert patches[0, 3].sum() == 0.0
 
 
 @pytest.mark.integration

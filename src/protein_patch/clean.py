@@ -1,4 +1,4 @@
-from typing import IO, Union
+from typing import IO
 
 from Bio.PDB import PDBParser
 from Bio.PDB.Structure import Structure
@@ -6,7 +6,7 @@ from Bio.PDB.Structure import Structure
 _WATER = {"HOH", "WAT", "TIP", "TIP3", "SOL"}
 
 
-def load_clean_structure(name: str, handle: Union[IO, str]) -> Structure:
+def load_clean_structure(name: str, handle: IO | str) -> Structure:
     """Parse a PDB and strip waters + heteroatoms in-process.
 
     Replaces the old clean.sh (pdb4amber + sed). A residue is dropped if
