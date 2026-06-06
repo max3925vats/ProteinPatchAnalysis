@@ -1,5 +1,7 @@
 import io
+import urllib.request
 import numpy as np
+import pytest
 from protein_patch.clean import load_clean_structure
 from protein_patch.spec import PatchSpec
 from protein_patch.patches import extract_patches
@@ -27,3 +29,18 @@ def test_extract_patches_shape_and_count():
     assert patches.shape == (1, 4, 16, 16, 16)   # (n, C, L, L, L), channel-first
     assert patches.dtype == np.float32
     assert not np.isnan(patches).any()
+
+
+@pytest.mark.integration
+def test_1ubq_end_to_end():
+    url = "https://files.rcsb.org/download/1UBQ.pdb"
+    try:
+        text = urllib.request.urlopen(url, timeout=20).read().decode()
+    except Exception:
+        pytest.skip("offline: cannot fetch 1UBQ")
+    struct = load_clean_structure("1ubq", io.StringIO(text))
+    spec = PatchSpec(sasa_threshold=0.2)
+    patches = extract_patches(struct, spec)
+    # ubiquitin (76 residues) yields a nonzero number of exposed patches
+    assert patches.shape[0] > 10
+    assert patches.shape[1:] == spec.array_shape
