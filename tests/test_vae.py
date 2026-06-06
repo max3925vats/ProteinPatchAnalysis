@@ -50,16 +50,17 @@ def test_vae_loss_handles_density_above_one():
 
 def test_one_epoch_training_runs(tmp_path, rng):
     import pickle
-    import numpy as np
+    from protein_patch.patches import AtomPatch
     from protein_patch.config import TrainConfig
     from protein_patch.model.train import train
-    spec = PatchSpec(grid_voxels=16)   # small + fast
+    spec = PatchSpec(grid_voxels=16)
     for split in ("train", "val"):
         d = tmp_path / split; d.mkdir()
         for i in range(4):
-            arr = rng.random((4, 16, 16, 16)).astype("float32")
+            coords = (rng.random((5, 3)).astype("float32") - 0.5) * 3.0
+            patch = AtomPatch(coords, ["C"] * 5, {}, ("x", "A", i, "ALA"))
             with open(d / f"p{i}.pickle", "wb") as f:
-                pickle.dump(arr, f)
+                pickle.dump(patch, f)
     cfg = TrainConfig(epochs=1, batch_size=2)
     hist = train(str(tmp_path / "train"), str(tmp_path / "val"), spec, cfg,
                  out=str(tmp_path / "h.json"))

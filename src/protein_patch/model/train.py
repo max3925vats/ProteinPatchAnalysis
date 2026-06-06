@@ -44,8 +44,8 @@ def train(train_dir: str, val_dir: str, spec: PatchSpec, cfg: TrainConfig,
     opt = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate)
     sched = torch.optim.lr_scheduler.StepLR(opt, cfg.lr_step_size, cfg.lr_gamma)
 
-    tl = DataLoader(PatchDataset(train_dir), batch_size=cfg.batch_size, shuffle=True)
-    vl = DataLoader(PatchDataset(val_dir), batch_size=cfg.batch_size)
+    tl = DataLoader(PatchDataset(train_dir, spec), batch_size=cfg.batch_size, shuffle=True)
+    vl = DataLoader(PatchDataset(val_dir, spec), batch_size=cfg.batch_size)
 
     stopper = EarlyStopping(cfg.patience)
     hist: dict[str, list[float]] = {"train_loss": [], "val_loss": []}

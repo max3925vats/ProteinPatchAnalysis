@@ -43,14 +43,16 @@ def test_early_stopping_disabled_when_patience_zero():
 # --- checkpoint saving (train wiring) ---------------------------------------
 
 def _make_patches(tmp_path, rng):
+    from protein_patch.patches import AtomPatch
     spec = PatchSpec(grid_voxels=16)
     for split in ("train", "val"):
         d = tmp_path / split
         d.mkdir()
         for i in range(4):
-            arr = rng.random((4, 16, 16, 16)).astype("float32")
+            coords = (rng.random((5, 3)).astype("float32") - 0.5) * 3.0
+            patch = AtomPatch(coords, ["C"] * 5, {}, ("x", "A", i, "ALA"))
             with open(d / f"p{i}.pickle", "wb") as f:
-                pickle.dump(arr, f)
+                pickle.dump(patch, f)
     return spec
 
 
