@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 import torch
 
 from protein_patch.spec import PatchSpec
@@ -26,3 +27,10 @@ def test_pca_2d_reduces_to_two_columns():
     out = pca_2d(x)
     assert out.shape == (20, 2)
     assert out[:, 0].var() >= out[:, 1].var()
+
+
+def test_pca_2d_rejects_degenerate_input():
+    with pytest.raises(ValueError):
+        pca_2d(np.zeros((1, 4)))     # only one sample
+    with pytest.raises(ValueError):
+        pca_2d(np.zeros((10, 1)))    # only one dimension

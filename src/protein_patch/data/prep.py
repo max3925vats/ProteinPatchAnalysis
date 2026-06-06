@@ -45,7 +45,8 @@ def prep_dataset(pdb_dir: str | Path, out_dir: str | Path, spec: PatchSpec,
         (out_dir / split).mkdir(parents=True, exist_ok=True)
 
     rows: list[dict] = []
-    train_pdbs: list[str] = []
+    # only count PDBs that actually produced patches (symmetric train/val)
+    succeeded: dict[str, list[str]] = {"train": [], "val": []}
     # NOTE: serial on purpose (deterministic + simple to test). `process_one`
     # is the pure per-protein unit a multiprocessing.Pool would map over if
     # prep wall-time ever becomes a bottleneck at scale.
@@ -56,8 +57,7 @@ def prep_dataset(pdb_dir: str | Path, out_dir: str | Path, spec: PatchSpec,
         except Exception as e:
             logger.warning("skipping %s: %s", pdb.name, e)
             continue
-        if split == "train":
-            train_pdbs.append(pdb.stem)   # only count PDBs that actually produced patches
+        succeeded[split].append(pdb.stem)
         for p in patches:
             pid, chain, resseq, icode, resname = p.provenance
             fname = f"{pid}_{chain}_{resseq}{icode}.pickle"   # icode keeps 47A/47B distinct
@@ -73,5 +73,5 @@ def prep_dataset(pdb_dir: str | Path, out_dir: str | Path, spec: PatchSpec,
         w.writeheader()
         w.writerows(rows)
 
-    return {"n_patches": len(rows), "val_pdbs": sorted(val_pdbs),
-            "train_pdbs": sorted(train_pdbs)}
+    return {"n_patches": len(rows), "val_pdbs": sorted(succeeded["val"]),
+            "train_pdbs": sorted(succeeded["train"])}

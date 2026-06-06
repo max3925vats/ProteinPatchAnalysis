@@ -51,6 +51,9 @@ def pca_2d(embeddings: np.ndarray) -> np.ndarray:
         Array of shape ``(n, 2)``.
     """
     x = np.asarray(embeddings, dtype=np.float64)
+    if x.ndim != 2 or x.shape[0] < 2 or x.shape[1] < 2:
+        raise ValueError(
+            f"pca_2d needs >=2 samples and >=2 dimensions, got shape {x.shape}")
     x = x - x.mean(axis=0)          # center columns
     _, _, vt = np.linalg.svd(x, full_matrices=False)
     return x @ vt[:2].T              # project onto first two right-singular vectors

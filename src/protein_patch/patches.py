@@ -35,7 +35,7 @@ def extract_atom_patches(structure: Structure, spec: PatchSpec,
         for chain in model:
             for res in chain:
                 name = res.get_resname().strip()
-                key = (chain.id, res.id[1], name)
+                key = (model.id, chain.id, res.id[1], name)
                 if exposure.get(key, 0.0) < spec.sasa_threshold:
                     continue
                 if len(list(res.get_atoms())) == 0:
