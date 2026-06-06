@@ -1,4 +1,5 @@
 import json
+import os
 import random
 from pathlib import Path
 
@@ -13,9 +14,15 @@ from .vae import ConvVAE3D, vae_loss
 
 
 def set_seed(seed: int) -> None:
+    """Seed all RNGs for reproducibility, including CUDA and cuDNN."""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    # deterministic cuDNN (may cost some GPU throughput, worth it for repro)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 def train(train_dir: str, val_dir: str, spec: PatchSpec, cfg: TrainConfig,
