@@ -63,3 +63,20 @@ class ConvVAE3D(nn.Module):
         mu, logvar = self.encode(x)
         z = reparameterize(mu, logvar)
         return self.decode(z), mu, logvar
+
+
+def vae_loss(
+    recon: torch.Tensor,
+    x: torch.Tensor,
+    mu: torch.Tensor,
+    logvar: torch.Tensor,
+    kl_weight: float = 5e-4,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Binary cross-entropy reconstruction + KL, returned decomposed.
+
+    BCE is summed per-sample then averaged over the batch; KL uses the
+    standard closed form -0.5 * sum(1 + logvar - mu^2 - exp(logvar)).
+    """
+    recon_l = F.binary_cross_entropy(recon, x, reduction="none").flatten(1).sum(1).mean()
+    kl_l = (-0.5 * (1 + logvar - mu.pow(2) - logvar.exp()).sum(1)).mean()
+    return recon_l + kl_weight * kl_l, recon_l, kl_l
