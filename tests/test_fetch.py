@@ -1,4 +1,5 @@
 from protein_patch.data.fetch import read_id_file, sample_random_pdb_ids, fetch_pdbs
+from protein_patch.data import fetch as fetch_mod
 
 
 def test_read_id_file_skips_blanks_and_comments(tmp_path):
@@ -28,3 +29,13 @@ def test_fetch_pdbs_skips_existing(tmp_path, monkeypatch):
     paths = fetch_pdbs(["1UBQ", "4HHB"], tmp_path, delay=0.0)
     assert calls == ["4HHB"]
     assert {p.name for p in paths} == {"1UBQ.pdb", "4HHB.pdb"}
+
+
+def test_cli_main_samples_and_fetches(tmp_path, monkeypatch):
+    monkeypatch.setattr(fetch_mod, "_fetch_current_entry_ids",
+                        lambda: [f"{i:04X}" for i in range(500)])
+    monkeypatch.setattr(fetch_mod, "_download_one",
+                        lambda pid, dest: dest.write_text("ATOM\n"))
+    from scripts.fetch_random_pdbs import main
+    main(["--n", "5", "--seed", "1", "--out", str(tmp_path), "--delay", "0"])
+    assert len(list(tmp_path.glob("*.pdb"))) == 5
