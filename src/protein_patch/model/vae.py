@@ -57,7 +57,11 @@ class ConvVAE3D(nn.Module):
         h = self.dec(h)
         h = F.interpolate(h, size=(self.spec.grid_voxels,) * 3,
                           mode="trilinear", align_corners=False)
-        return torch.sigmoid(h)
+        # softplus: non-negative and unbounded, matching the accumulated
+        # Gaussian density field whose voxels can exceed 1.0 where atoms
+        # overlap. (sigmoid would cap the output at 1 and could not
+        # reproduce those peaks.)
+        return F.softplus(h)
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         mu, logvar = self.encode(x)
@@ -70,13 +74,19 @@ def vae_loss(
     x: torch.Tensor,
     mu: torch.Tensor,
     logvar: torch.Tensor,
-    kl_weight: float = 5e-4,
+    kl_weight: float = 1.0,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Binary cross-entropy reconstruction + KL, returned decomposed.
+    """MSE reconstruction + KL, returned decomposed (total, recon, kl).
 
-    BCE is summed per-sample then averaged over the batch; KL uses the
-    standard closed form -0.5 * sum(1 + logvar - mu^2 - exp(logvar)).
+    Reconstruction is MSE (the Gaussian-likelihood loss appropriate for a
+    continuous, unbounded density field), summed over voxels per sample
+    then averaged over the batch. KL uses the standard closed form
+    -0.5 * sum(1 + logvar - mu^2 - exp(logvar)), summed over the latent
+    dim then averaged over the batch. Summing both per sample keeps them
+    on the same "total per sample" footing; `kl_weight` is the ELBO/beta
+    knob (1.0 = plain ELBO) and is expected to be tuned for these sparse,
+    high-dimensional patches.
     """
-    recon_l = F.binary_cross_entropy(recon, x, reduction="none").flatten(1).sum(1).mean()
+    recon_l = F.mse_loss(recon, x, reduction="none").flatten(1).sum(1).mean()
     kl_l = (-0.5 * (1 + logvar - mu.pow(2) - logvar.exp()).sum(1)).mean()
     return recon_l + kl_weight * kl_l, recon_l, kl_l

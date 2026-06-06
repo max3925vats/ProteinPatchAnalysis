@@ -19,7 +19,9 @@ def test_vae_round_trips_shape():
     recon, mu, logvar = model(x)
     assert recon.shape == x.shape
     assert mu.shape == (2, 4) and logvar.shape == (2, 4)
-    assert torch.all((recon >= 0) & (recon <= 1))  # sigmoid output
+    # softplus head: non-negative and UNBOUNDED (can exceed 1 to match
+    # overlapping-atom density peaks). Only the lower bound is guaranteed.
+    assert torch.all(recon >= 0)
 
 
 def test_vae_loss_is_finite_and_decomposes():
@@ -31,6 +33,19 @@ def test_vae_loss_is_finite_and_decomposes():
     assert torch.isfinite(total)
     assert recon_l >= 0 and kl_l >= 0
     assert torch.allclose(total, recon_l + 5e-4 * kl_l, atol=1e-4)
+
+
+def test_vae_loss_handles_density_above_one():
+    # Real patches accumulate overlapping Gaussians -> voxels > 1.0. MSE must
+    # handle that; the old BCE loss would raise on targets outside [0, 1].
+    # This is the regression guard for the BCE -> MSE switch.
+    spec = PatchSpec(grid_voxels=16)
+    model = ConvVAE3D(spec, latent_dim=4)
+    x = torch.rand(2, *spec.array_shape) * 2.0   # values in [0, 2)
+    assert x.max() > 1.0
+    recon, mu, logvar = model(x)
+    total, recon_l, kl_l = vae_loss(recon, x, mu, logvar)
+    assert torch.isfinite(total) and recon_l >= 0
 
 
 def test_one_epoch_training_runs(tmp_path, rng):

@@ -9,5 +9,5 @@ class TrainConfig:
     lr_step_size: int = 30      # epochs between LR decay (replaces no-op `decay`)
     lr_gamma: float = 0.5       # multiplicative LR decay factor
     latent_dim: int = 4
-    kl_weight: float = 5e-4
+    kl_weight: float = 1.0      # ELBO/beta knob; tune for these sparse patches
     seed: int = 42
