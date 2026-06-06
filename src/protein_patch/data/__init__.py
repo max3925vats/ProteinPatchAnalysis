@@ -1,15 +1,10 @@
-"""Data acquisition and dataset preparation."""
-from .attributes import KYTE_DOOLITTLE, ResidueAttributes, residue_attributes
-from .fetch import fetch_pdbs, read_id_file, sample_random_pdb_ids
-from .prep import prep_dataset, process_one
+"""Data acquisition and dataset preparation.
 
-__all__ = [
-    "KYTE_DOOLITTLE",
-    "ResidueAttributes",
-    "residue_attributes",
-    "fetch_pdbs",
-    "read_id_file",
-    "sample_random_pdb_ids",
-    "prep_dataset",
-    "process_one",
-]
+Note: `prep` and `fetch` are intentionally NOT re-exported here. `prep`
+imports from `protein_patch.patches`, which imports `data.attributes`, so
+re-exporting them would create a circular import. Import them by full path:
+`from protein_patch.data.prep import prep_dataset`.
+"""
+from .attributes import KYTE_DOOLITTLE, ResidueAttributes, residue_attributes
+
+__all__ = ["KYTE_DOOLITTLE", "ResidueAttributes", "residue_attributes"]
