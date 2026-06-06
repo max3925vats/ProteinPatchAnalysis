@@ -35,6 +35,31 @@ def test_extract_patches_shape_and_count():
     assert patches[0, 3].sum() == 0.0
 
 
+from protein_patch.patches import AtomPatch, extract_atom_patches, voxelize
+
+
+def test_atom_patches_are_centered_with_attrs():
+    struct = load_clean_structure("t", io.StringIO(PDB_TEXT))
+    spec = PatchSpec(grid_voxels=16, voxel_size=0.5, sasa_threshold=0.0)
+    patches = extract_atom_patches(struct, spec, pdb_id="t")
+    assert len(patches) == 1
+    p = patches[0]
+    assert isinstance(p, AtomPatch)
+    half = spec.side_angstroms / 2.0
+    assert np.all(np.abs(p.coords) <= half + 1e-6)
+    assert p.provenance == ("t", "A", 1, "ALA")
+    assert p.attrs["resname"] == "ALA" and p.attrs["charge"] == 0.0
+
+
+def test_voxelize_atompatch_matches_extract_patches_grid():
+    # Regression guard: the atom-set path reproduces the old grid exactly.
+    struct = load_clean_structure("t", io.StringIO(PDB_TEXT))
+    spec = PatchSpec(grid_voxels=16, voxel_size=0.5, sasa_threshold=0.0)
+    grid_via_wrapper = extract_patches(struct, spec)
+    grid_via_atomset = voxelize(extract_atom_patches(struct, spec)[0], spec)
+    assert np.array_equal(grid_via_wrapper[0], grid_via_atomset)
+
+
 @pytest.mark.integration
 def test_1ubq_end_to_end():
     url = "https://files.rcsb.org/download/1UBQ.pdb"
