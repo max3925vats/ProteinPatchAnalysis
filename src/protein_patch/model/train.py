@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import random
 from pathlib import Path
@@ -11,6 +12,8 @@ from ..config import TrainConfig
 from ..spec import PatchSpec
 from .dataset import PatchDataset
 from .vae import ConvVAE3D, vae_loss
+
+logger = logging.getLogger(__name__)
 
 
 def set_seed(seed: int) -> None:
@@ -26,7 +29,13 @@ def set_seed(seed: int) -> None:
 
 
 def train(train_dir: str, val_dir: str, spec: PatchSpec, cfg: TrainConfig,
-          out: str = "history.json") -> dict:
+          out: str | Path | None = None) -> dict[str, list[float]]:
+    """Train the VAE and return the loss history.
+
+    History is written to `out` as JSON only when `out` is provided; the
+    default writes nothing (so calling from a notebook/script never drops a
+    stray file into the working directory).
+    """
     set_seed(cfg.seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = ConvVAE3D(spec, cfg.latent_dim).to(device)
@@ -37,7 +46,7 @@ def train(train_dir: str, val_dir: str, spec: PatchSpec, cfg: TrainConfig,
     vl = DataLoader(PatchDataset(val_dir), batch_size=cfg.batch_size)
 
     hist: dict[str, list[float]] = {"train_loss": [], "val_loss": []}
-    for _ in range(cfg.epochs):
+    for epoch in range(cfg.epochs):
         model.train(); tr = 0.0
         for x in tl:
             x = x.to(device)
@@ -54,8 +63,13 @@ def train(train_dir: str, val_dir: str, spec: PatchSpec, cfg: TrainConfig,
                 recon, mu, logvar = model(x)
                 loss, _, _ = vae_loss(recon, x, mu, logvar, cfg.kl_weight)
                 va += loss.item()
-        hist["train_loss"].append(tr / max(len(tl), 1))
-        hist["val_loss"].append(va / max(len(vl), 1))
+        train_loss = tr / max(len(tl), 1)
+        val_loss = va / max(len(vl), 1)
+        hist["train_loss"].append(train_loss)
+        hist["val_loss"].append(val_loss)
+        logger.info("epoch %d/%d  train=%.4f  val=%.4f",
+                    epoch + 1, cfg.epochs, train_loss, val_loss)
 
-    Path(out).write_text(json.dumps(hist))
+    if out is not None:
+        Path(out).write_text(json.dumps(hist))
     return hist

@@ -6,7 +6,6 @@ dependencies = [
     "numpy>=1.26",
     "biopython>=1.81",
     "torch>=2.2",
-    "omegaconf>=2.3",
 ]
 
 [project.optional-dependencies]
