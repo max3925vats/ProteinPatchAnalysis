@@ -3,6 +3,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from ..spec import PatchSpec
+from .encoders import VoxelEncoder
 
 
 def reparameterize(mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
@@ -16,31 +17,41 @@ def reparameterize(mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
     return mu + std * eps
 
 
-class ConvVAE3D(nn.Module):
-    """3D convolutional VAE for (C, L, L, L) patches.
+def _downsampled_dim(length: int, times: int = 3) -> int:
+    """Spatial size after `times` stride-2, kernel-3, padding-1 conv layers.
 
-    Encoder halves the spatial dims three times (e.g. 64->32->16->8 with
-    padding), then a dense bottleneck to mu/logvar. Decoder mirrors it and
-    interpolates back to exactly L on output, so the round-trip shape is
-    guaranteed regardless of size.
+    Mirrors the VoxelEncoder downsampling so the decoder's start volume is
+    derived from `spec` alone, NOT from the encoder — that's what lets a
+    non-grid (point) encoder share this decoder. floor((L-1)/2)+1 per layer
+    (64->8, 16->2).
+    """
+    d = length
+    for _ in range(times):
+        d = (d - 1) // 2 + 1
+    return d
+
+
+class VAE3D(nn.Module):
+    """Encoder-agnostic 3D VAE: any encoder -> latent -> (C, L, L, L) grid.
+
+    The encoder maps its native input to a flat (B, feature_dim) feature; mu/logvar
+    heads are sized from `encoder.feature_dim`. The decoder's start volume is
+    derived from `spec` (not the encoder), so the SAME decoder serves a voxel-CNN
+    encoder and a point-cloud encoder — the reconstruction target is always the
+    voxel grid (the controlled-ablation choice). Output interpolates back to
+    exactly L, so the round-trip shape holds for any grid size.
     """
 
-    def __init__(self, spec: PatchSpec, latent_dim: int = 8):
+    def __init__(self, encoder: nn.Module, spec: PatchSpec, latent_dim: int = 8):
         super().__init__()
         self.spec = spec
+        self.encoder = encoder
         C, L = spec.n_channels, spec.grid_voxels
-        self.enc = nn.Sequential(
-            nn.Conv3d(C, 32, 3, stride=2, padding=1), nn.ReLU(),
-            nn.Conv3d(32, 64, 3, stride=2, padding=1), nn.ReLU(),
-            nn.Conv3d(64, 128, 3, stride=2, padding=1), nn.ReLU(),
-        )
-        with torch.no_grad():
-            dummy = torch.zeros(1, C, L, L, L)
-            enc_out = self.enc(dummy)
-        self._enc_shape = enc_out.shape[1:]          # (128, d, d, d)
-        flat = int(torch.prod(torch.tensor(self._enc_shape)))
-        self.fc_mu = nn.Linear(flat, latent_dim)
-        self.fc_logvar = nn.Linear(flat, latent_dim)
+        d = _downsampled_dim(L)
+        self._start_shape = (128, d, d, d)
+        flat = 128 * d ** 3
+        self.fc_mu = nn.Linear(encoder.feature_dim, latent_dim)
+        self.fc_logvar = nn.Linear(encoder.feature_dim, latent_dim)
         self.fc_dec = nn.Linear(latent_dim, flat)
         self.dec = nn.Sequential(
             nn.ConvTranspose3d(128, 64, 3, stride=2, padding=1), nn.ReLU(),
@@ -48,12 +59,12 @@ class ConvVAE3D(nn.Module):
             nn.ConvTranspose3d(32, C, 3, stride=2, padding=1),
         )
 
-    def encode(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        h = self.enc(x).flatten(1)
+    def encode(self, x) -> tuple[torch.Tensor, torch.Tensor]:
+        h = self.encoder(x)
         return self.fc_mu(h), self.fc_logvar(h)
 
     def decode(self, z: torch.Tensor) -> torch.Tensor:
-        h = self.fc_dec(z).view(-1, *self._enc_shape)
+        h = self.fc_dec(z).view(-1, *self._start_shape)
         h = self.dec(h)
         h = F.interpolate(h, size=(self.spec.grid_voxels,) * 3,
                           mode="trilinear", align_corners=False)
@@ -63,10 +74,22 @@ class ConvVAE3D(nn.Module):
         # reproduce those peaks.)
         return F.softplus(h)
 
-    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(self, x) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         mu, logvar = self.encode(x)
         z = reparameterize(mu, logvar)
         return self.decode(z), mu, logvar
+
+
+class ConvVAE3D(VAE3D):
+    """Voxel 3D-conv VAE — now just VAE3D fronted by a VoxelEncoder.
+
+    Kept as a named subclass for backward compatibility: same public API
+    (``__init__(spec, latent_dim)``, ``encode``/``decode``/``forward``) the rest
+    of the codebase and tests already use.
+    """
+
+    def __init__(self, spec: PatchSpec, latent_dim: int = 8):
+        super().__init__(VoxelEncoder(spec), spec, latent_dim)
 
 
 def vae_loss(
