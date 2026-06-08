@@ -29,6 +29,9 @@ dist/
 *#
 .#*
 
+# OS cruft
+.DS_Store
+
 # Internal docs / notes / decks (README.md stays tracked; everything else doesn't)
 *.md
 !README.md
