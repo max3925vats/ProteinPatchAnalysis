@@ -2,6 +2,20 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
+class ContrastiveConfig:
+    """Decoder-free NT-Xent training knobs (identical across encoders)."""
+    epochs: int = 50
+    batch_size: int = 64
+    learning_rate: float = 1e-3
+    temperature: float = 0.5
+    proj_dim: int = 64
+    hidden: int = 128
+    jitter_sigma: float = 0.5      # angstroms
+    drop_frac: float = 0.1
+    seed: int = 0
+
+
+@dataclass(frozen=True)
 class TrainConfig:
     epochs: int = 100
     batch_size: int = 64
