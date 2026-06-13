@@ -23,6 +23,31 @@ class AtomPatch:
     elements: list[str]                          # element symbol per atom
     attrs: ResidueAttributes                     # central-residue chemical attributes
     provenance: tuple[str, str, int, str, str]   # (pdb_id, chain, resseq, icode, resname)
+    central_mask: np.ndarray | None = None       # bool per atom: belongs to the central residue
+
+
+def exclude_center(patch: AtomPatch) -> AtomPatch:
+    """Return the patch with the central residue's own atoms removed.
+
+    Used to build the environment-only view for the masked-identity probe, so a
+    latent predicts the central residue from its surroundings (no trivial readout
+    of the central sidechain). Requires `central_mask` (re-prep old patches).
+    """
+    mask = getattr(patch, "central_mask", None)
+    if mask is None:
+        raise ValueError(
+            "central_mask is required to exclude the central residue; re-prep the patch")
+    keep = ~np.asarray(mask, dtype=bool)
+    coords = np.asarray(patch.coords)[keep]
+    elements = [e for e, k in zip(patch.elements, keep) if k]
+    if not any(e.strip().upper() in ("C", "N", "O", "S") for e in elements):
+        # an environment with no C/N/O/S is not encodable (the voxel/point views
+        # would be empty). Fail explicitly rather than crash downstream.
+        raise ValueError(
+            f"patch {patch.provenance} has no C/N/O/S atoms left after excluding "
+            "the central residue")
+    return AtomPatch(coords, elements, patch.attrs, patch.provenance,
+                     np.zeros(coords.shape[0], dtype=bool))
 
 
 def extract_atom_patches(structure: Structure, spec: PatchSpec,
@@ -41,17 +66,19 @@ def extract_atom_patches(structure: Structure, spec: PatchSpec,
                 if len(list(res.get_atoms())) == 0:
                     continue
                 center = _residue_cog(res)
-                sel_c, sel_e = [], []
+                sel_c, sel_e, sel_m = [], [], []
                 for atom in model.get_atoms():
                     c = atom.get_coord()
                     if np.all(np.abs(c - center) <= half):
                         sel_c.append(c)
                         sel_e.append(atom.element)
+                        sel_m.append(atom.get_parent() is res)   # central-residue atom?
                 centered = np.asarray(sel_c, dtype=np.float64) - center
                 attrs = residue_attributes(name, exposure.get(key, 0.0))
                 icode = res.id[2].strip()   # insertion code ("" if none)
                 patches.append(AtomPatch(centered, sel_e, attrs,
-                                         (pdb_id, chain.id, res.id[1], icode, name)))
+                                         (pdb_id, chain.id, res.id[1], icode, name),
+                                         np.asarray(sel_m, dtype=bool)))
     return patches
 
 
