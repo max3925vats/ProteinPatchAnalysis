@@ -7,7 +7,7 @@ A patch is a cubic grid centred on a solvent-exposed residue, with one channel p
 atom type (C, N, O, S) holding a Gaussian atomic-density field. Patches are stored
 **channel-first** as `(n_channels, L, L, L)`.
 
-## Modernized pipeline (2026)
+## Pipeline
 
 Pure Python — no GROMACS, AmberTools, or Keras. Everything lives in
 `src/protein_patch/`:
