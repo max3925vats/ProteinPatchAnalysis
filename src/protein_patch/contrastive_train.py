@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from .augment import augment_atom_patch
 from .config import ContrastiveConfig
-from .patches import AtomPatch, voxelize
+from .patches import AtomPatch, exclude_center, voxelize
 from .spec import PatchSpec
 from .model.contrastive import ContrastiveModel, nt_xent_loss
 from .model.dataset import PatchDataset
@@ -39,12 +39,13 @@ class ContrastiveViewDataset(Dataset):
     """
 
     def __init__(self, kind: str, root: str | Path, spec: PatchSpec,
-                 ccfg: ContrastiveConfig):
+                 ccfg: ContrastiveConfig, exclude_center_atoms: bool = False):
         if kind not in _KINDS:
             raise ValueError(f"kind must be one of {_KINDS}, got {kind!r}")
         self.kind = kind
         self.spec = spec
         self.ccfg = ccfg
+        self.exclude_center_atoms = exclude_center_atoms
         self.paths = sorted(Path(root).glob("*.pickle"))
         if not self.paths:
             raise FileNotFoundError(f"no *.pickle patches in {root}")
@@ -74,6 +75,8 @@ class ContrastiveViewDataset(Dataset):
     def __getitem__(self, idx: int):
         with open(self.paths[idx], "rb") as f:
             patch: AtomPatch = pickle.load(f)
+        if self.exclude_center_atoms:
+            patch = exclude_center(patch)        # environment-only view
         return self._view(patch), self._view(patch), patch.provenance[0]
 
 
@@ -107,8 +110,13 @@ def _to_device(x, device: str):
 
 
 def train_contrastive(kind: str, train_dir: str, spec: PatchSpec,
-                      ccfg: ContrastiveConfig) -> tuple[dict[str, list[float]], torch.nn.Module]:
-    """Train NT-Xent for one encoder kind; return (history, the kept encoder)."""
+                      ccfg: ContrastiveConfig, exclude_center_atoms: bool = False
+                      ) -> tuple[dict[str, list[float]], torch.nn.Module]:
+    """Train NT-Xent for one encoder kind; return (history, the kept encoder).
+
+    With exclude_center_atoms=True the encoder trains on environment-only patches
+    (central residue removed) — the latent for the masked-identity probe.
+    """
     set_seed(ccfg.seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     encoder = (VoxelEncoder(spec) if kind == "voxel"
@@ -116,7 +124,7 @@ def train_contrastive(kind: str, train_dir: str, spec: PatchSpec,
     model = ContrastiveModel(encoder, hidden=ccfg.hidden, proj_dim=ccfg.proj_dim).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=ccfg.learning_rate)
 
-    ds = ContrastiveViewDataset(kind, train_dir, spec, ccfg)
+    ds = ContrastiveViewDataset(kind, train_dir, spec, ccfg, exclude_center_atoms)
     dl = DataLoader(ds, batch_size=ccfg.batch_size, shuffle=True, collate_fn=_collate(kind))
 
     hist: dict[str, list[float]] = {"loss": []}
@@ -148,6 +156,37 @@ def encode_dataset(encoder: torch.nn.Module, root: str, spec: PatchSpec,
                 mi = item.unsqueeze(0).to(device)
             else:
                 feats, _grid = item
+                mask = torch.ones(1, feats.shape[0], dtype=torch.bool)
+                mi = (feats.unsqueeze(0).to(device), mask.to(device))
+            rows.append(encoder(mi).cpu().numpy()[0])
+    return np.asarray(rows)
+
+
+def encode_patches(encoder: torch.nn.Module, root: str, spec: PatchSpec, kind: str,
+                   exclude_center_atoms: bool = False, device: str = "cpu") -> np.ndarray:
+    """Encoder features over single (un-augmented) views, in sorted-path order.
+
+    Loads AtomPatch pickles directly so it can optionally drop the central residue
+    (`exclude_center_atoms`) to match a center-excluded encoder. Order matches the
+    label loaders, so embeddings[i] aligns with labels[i].
+    """
+    encoder.eval().to(device)
+    rows = []
+    with torch.no_grad():
+        for p in sorted(Path(root).glob("*.pickle")):
+            with open(p, "rb") as f:
+                patch: AtomPatch = pickle.load(f)
+            if exclude_center_atoms:
+                patch = exclude_center(patch)
+            if kind == "voxel":
+                grid = np.ascontiguousarray(voxelize(patch, spec), dtype=np.float32)
+                mi = torch.from_numpy(grid).unsqueeze(0).to(device)
+            else:
+                pf = _point_features(patch)
+                if pf.shape[0] == 0:
+                    raise ValueError(
+                        f"patch {patch.provenance} has no C/N/O/S atoms to encode")
+                feats = torch.from_numpy(pf)
                 mask = torch.ones(1, feats.shape[0], dtype=torch.bool)
                 mi = (feats.unsqueeze(0).to(device), mask.to(device))
             rows.append(encoder(mi).cpu().numpy()[0])

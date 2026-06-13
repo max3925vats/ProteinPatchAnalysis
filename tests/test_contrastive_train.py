@@ -69,6 +69,22 @@ def test_train_contrastive_decreases_and_does_not_collapse(structured, kind):
     assert std_trained > 0.2 * std_untrained
 
 
+def test_train_contrastive_exclude_center_runs(tmp_path, rng):
+    # environment-only training: central atom removed before the views are built.
+    spec = PatchSpec(grid_voxels=16)
+    d = tmp_path / "train"; d.mkdir()
+    for i in range(6):
+        coords = (rng.random((6, 3)).astype("float32") - 0.5) * 3.0
+        mask = np.zeros(6, dtype=bool); mask[0] = True          # one central atom
+        patch = AtomPatch(coords, ["C", "N", "O", "S", "C", "N"],
+                          {"rel_sasa": 0.5}, (f"p{i % 2}", "A", i, "", "ALA"), mask)
+        with open(d / f"p{i}.pickle", "wb") as f:
+            pickle.dump(patch, f)
+    ccfg = ContrastiveConfig(epochs=2, batch_size=4, proj_dim=16, hidden=32)
+    hist, enc = train_contrastive("point", str(d), spec, ccfg, exclude_center_atoms=True)
+    assert all(np.isfinite(v) for v in hist["loss"])
+
+
 def test_point_view_never_empty_with_hydrogens(tmp_path, rng):
     # 1 CNOS atom (C) among many H + aggressive dropout: the CNOS fallback (C7)
     # must keep every point view encodable rather than producing an empty tensor.
